@@ -135,7 +135,6 @@ curl -X POST \\
 
 ---
 
-**Autor:** Manus AI
 **Data:** 3 de julho de 2025
 
 
