@@ -10,64 +10,63 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 
-def buscar_quiz(id, data_inicio, data_fim,username):
+from flask import jsonify
+import pandas as pd
+
+def buscar_quiz(id, data_inicio, data_fim, username):
     """
-    Função responsável por buscar os dados do quiz no banco de dados, tratar as informações 
-    e retornar os dados formatados como JSON.
-
-    Parâmetros:
-    - id (int): ID do quiz.
-    - data_inicio (str): Data de início do filtro.
-    - data_fim (str): Data de fim do filtro.
-
-    Retorno:
-    - JSON contendo os dados organizados nos DataFrames (Disciplina, Questões, Pessoas e Respostas).
+    Busca os dados do quiz e retorna no formato estruturado:
+    {
+        "disciplina": {...},
+        "questoes": [...]
+    }
     """
-
     # 🔹 Busca os dados no banco de dados
-    quiz_dict = buscar_select_banco(id, data_inicio, data_fim,username)
-    # 🔹 Converte os dados para um DataFrame do Pandas
+    quiz_dict = buscar_select_banco(id, data_inicio, data_fim, username)
     df = pd.DataFrame(quiz_dict)
 
-    # 🔹 Ajustes no formato do texto (remoção de quebras de linha e limpeza de HTML)
+    # 🔹 Verifica se há dados
     if df.empty:
-    # DataFrame vazio, retorne algo ou trate o caso
         return jsonify({"message": "Nenhum dado encontrado no período informado."}), 404
 
-    # Só continua se houver dados
-    df['enunciado'] = df['enunciado'].str.replace(r'[\r\n]', ' ', regex=True)
-    df['alternativa_correta'] = df['alternativa_correta'].str.replace(r'[\r\n]', ' ', regex=True)  
-    df['respostas_concatenada'] = df['respostas_concatenada'].str.replace(r'[\r\n]', ' ', regex=True)  
+    # 🔹 Limpeza de textos e HTML
+    df['enunciado'] = df['enunciado'].str.replace(r'[\r\n]', ' ', regex=True).apply(limparHtml)
+    df['alternativa_correta'] = df['alternativa_correta'].str.replace(r'[\r\n]', ' ', regex=True)
+    df['respostas_concatenada'] = df['respostas_concatenada'].str.replace(r'[\r\n]', ' ', regex=True).apply(limparHtml)
 
-    # Aplicação da limpeza de HTML nos textos das questões e respostas
-    df['enunciado'] = df['enunciado'].apply(limparHtml)
-    df['respostas_concatenada'] = df['respostas_concatenada'].apply(limparHtml)
+    # 🔹 Converte isCerta para booleano
+    df['iscerta'] = df['iscerta'].astype(int).apply(lambda x: True if x == 1 else False)
 
-    # 🔹 Conversão de colunas numéricas para float e arredondamento
-    df['iscerta'] = df['iscerta'].astype(float).round(1)
+    # 🔹 Pega os dados da disciplina (apenas uma)
+    disciplina = df[['idDisciplina', 'nomeDisciplina']].drop_duplicates().iloc[0].to_dict()
+    
+    # 🔹 Monta a lista de questões com estrutura de resposta_aluno
+    questoes = []
+    for _, row in df.iterrows():
+        questao = {
+            "alternativa_correta": row["alternativa_correta"],
+            "enunciado": row["enunciado"],
+            "hora_realizada": row["hora_realizada"],
+            "idPergunta": row["idPergunta"],
+            "idQuestao": row["idQuestao"],
+            "respostas_concatenada": [res.strip() for res in row["respostas_concatenada"].split("##@@##")], 
+            "resposta_aluno": {
+                "idPergunta": row["idPergunta"],
+                "idQuestao": row["idQuestao"],
+                "idUser": row["idUser"],
+                "iscerta": row["iscerta"]
+            }
+        }
+        questoes.append(questao)
 
-    # 🔹 Criação de diferentes DataFrames organizando os dados
-    # DataFrame contendo informações da disciplina
-    df_Disciplina = df[['nomeDisciplina', 'idDisciplina']].drop_duplicates()
+    # 🔹 Monta o dicionário final
+    resultado = {
+        "disciplina": disciplina,
+        "questoes": questoes
+    }
 
-    # DataFrame contendo informações dos estudantes
-    df_Pessoa = df[['estudante', 'idUser', 'email']].drop_duplicates()
+    return jsonify(resultado)
 
-    # DataFrame contendo informações das questões
-    df_Questoes = df[['idQuestao', 'idPergunta', 'enunciado', 'alternativa_correta', 'respostas_concatenada', 'hora_realizada']]
-    df_Questoes = df_Questoes.sort_values(by='hora_realizada', ascending=False)
-    df_Questoes = df_Questoes.drop_duplicates(subset=['idQuestao', 'enunciado', 'alternativa_correta', 'respostas_concatenada'], keep='first')
-
-    # DataFrame contendo as respostas dos usuários
-    df_Respostas = df[['idUser', 'idQuestao', 'idPergunta', 'iscerta']]
-
-    # 🔹 Retorna os dados em formato JSON
-    return jsonify(
-        df_Disciplina.to_dict(orient='records'),
-        df_Questoes.to_dict(orient='records'), 
-        df_Pessoa.to_dict(orient='records'),
-        df_Respostas.to_dict(orient='records')
-    )
 
 
 def verify_token(token):
