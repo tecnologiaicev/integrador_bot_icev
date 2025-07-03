@@ -53,7 +53,7 @@ def buscar_select_banco(id_disc, data_inicio, data_fim, username):
         FROM icev_course ic 
         JOIN icev_course_modules icm ON icm.course = ic.id 
         JOIN icev_quiz iq ON icm.instance = iq.id 
-        JOIN icev_quiz_sections iqs ON iqs.quizid = iq.id 
+        #JOIN icev_quiz_sections iqs ON iqs.quizid = iq.id 
         JOIN icev_quiz_attempts iqa ON iqa.quiz = iq.id 
         JOIN icev_user iu ON iu.id = iqa.userid
         JOIN icev_question_usages iqu ON iqu.id = iqa.uniqueid

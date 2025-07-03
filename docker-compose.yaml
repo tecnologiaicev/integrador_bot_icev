@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     image: iceverino/feature-0.1
     ports:
-      - "5000:5000"
+      - "5003:5000"
     env_file:
       - .env
     volumes:
