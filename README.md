@@ -75,7 +75,7 @@ A API estará disponível em `http://127.0.0.1:5000` (ou na porta configurada pe
 
   ```json
   {
-    "cpf": "123.456.789-00"
+    "cpf": "12345678900"
   }
   ```
 
